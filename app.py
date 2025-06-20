@@ -61,7 +61,7 @@ st.markdown("""
     }
 
     /* Стиль для текстових полів (API Key) та інших input-ів */
-    .stTextInput label, .stDateInput label, .stTimeInput label, .stMultiSelect label {
+    .stTextInput label, .stDateInput label, .stTimeInput label, .stMultiSelect label, .stSelectbox label {
         color: #555555; /* Темніший колір для назви поля */
         font-size: 1rem;
         font-weight: bold;
@@ -70,17 +70,19 @@ st.markdown("""
     }
     .stTextInput div[data-baseweb="input"] input,
     .stDateInput div[data-baseweb="input"] input,
-    .stTimeInput div[data-baseweb="input"] input {
+    .stTimeInput div[data-baseweb="input"] input,
+    .stSelectbox div[data-baseweb="select"] { /* Добавлено для Selectbox */
         border: 1px solid #b0b0b0; /* Трохи темніша рамка для кращого контрасту */
         border-radius: 4px;
         padding: 0.5rem 1rem;
         font-size: 1rem;
         color: #333333;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); /* Внутрішня тінь для ефекту глибини */
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); /* Внутрішня тінь для ефекту глибины */
     }
     .stTextInput div[data-baseweb="input"]:focus-within,
     .stDateInput div[data-baseweb="input"]:focus-within,
-    .stTimeInput div[data-baseweb="input"]:focus-within {
+    .stTimeInput div[data-baseweb="input"]:focus-within,
+    .stSelectbox div[data-baseweb="select"]:focus-within { /* Добавлено для Selectbox */
         border-color: #7ab800; /* Зелена рамка при фокусі */
         box-shadow: 0 0 0 0.1rem rgba(122, 184, 0, 0.25); /* Легка зелена тінь при фокусі */
     }
@@ -221,35 +223,103 @@ if not api_key:
 # --- Вибір діапазону дат та часу ---
 st.header("Оберіть період для звіту")
 
-# Поточна дата та час в UTC
-now_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+# Функции для обновления session_state для времени
+def update_start_time():
+    st.session_state['start_time_value'] = st.session_state['start_time_input_key']
 
-# Значення за замовчуванням: останні 24 години
-default_start_datetime = now_utc - datetime.timedelta(days=1)
-default_end_datetime = now_utc
+def update_end_time():
+    st.session_state['end_time_value'] = st.session_state['end_time_input_key']
 
-# Віджети вибору дати
+# Инициализация session_state для хранения выбранного времени и часового пояса
+if 'start_time_value' not in st.session_state:
+    st.session_state['start_time_value'] = datetime.time(0, 0, 0)
+if 'end_time_value' not in st.session_state:
+    st.session_state['end_time_value'] = datetime.time(23, 59, 59)
+
+# Получаем список всех часовых поясов из pytz
+all_timezones = sorted(pytz.all_timezones)
+
+# Определяем часовой пояс по умолчанию. Попробуем угадать местный, или установим Киев.
+default_timezone = "Europe/Kiev" # Начальное значение по умолчанию
+try:
+    # Попытка получить локальный часовой пояс пользователя
+    import tzlocal
+    local_tz = tzlocal.get_localzone().zone
+    if local_tz in all_timezones:
+        default_timezone = local_tz
+except Exception:
+    pass # Если tzlocal не сработал или не установлен, оставим default_timezone
+
+if 'selected_timezone' not in st.session_state:
+    st.session_state['selected_timezone'] = default_timezone
+
+# Виджет выбора часового пояса
+selected_timezone_str = st.selectbox(
+    "Оберіть ваш часовий пояс:",
+    options=all_timezones,
+    index=all_timezones.index(st.session_state['selected_timezone']), # Устанавливаем выбранный по умолчанию
+    key="timezone_select_key",
+    help="Всі дати та час нижче будуть інтерпретуватися у вибраному часовому поясі, а потім конвертовані в UTC для Mapon API."
+)
+# Обновляем session_state после выбора часового пояса
+st.session_state['selected_timezone'] = selected_timezone_str
+
+# Создаем объект часового пояса из выбранной строки
+try:
+    local_tz_object = pytz.timezone(selected_timezone_str)
+except pytz.UnknownTimeZoneError:
+    st.error(f"Помилка: Невідомий часовий пояс '{selected_timezone_str}'. Будь ласка, оберіть інший.")
+    st.stop()
+
+# Текущая дата в местном часовом поясе
+now_local_datetime = datetime.datetime.now(local_tz_object)
+default_start_date = (now_local_datetime - datetime.timedelta(days=1)).date()
+default_end_date = now_local_datetime.date()
+
+
 col1, col2 = st.columns(2)
 with col1:
-    start_date = st.date_input("Дата початку", value=default_start_datetime.date())
-    start_time = st.time_input("Час початку (UTC)", value=default_start_datetime.time(), step=300)
+    start_date = st.date_input("Дата початку (обраний часовий пояс)", value=default_start_date)
+    start_time_selected = st.time_input(
+        "Час початку (обраний часовий пояс)",
+        value=st.session_state['start_time_value'],
+        step=300, # Шаг в секундах (300 секунд = 5 минут)
+        key="start_time_input_key", # Уникальный ключ для виджета
+        on_change=update_start_time # Вызываем функцию при изменении
+    )
+
 with col2:
-    end_date = st.date_input("Дата закінчення", value=default_end_datetime.date())
-    end_time = st.time_input("Час закінчення (UTC)", value=default_end_datetime.time(), step=300)
+    end_date = st.date_input("Дата закінчення (обраний часовий пояс)", value=default_end_date)
+    end_time_selected = st.time_input(
+        "Час закінчення (обраний часовий пояс)",
+        value=st.session_state['end_time_value'],
+        step=300, # Шаг в секундах (300 секунд = 5 минут)
+        key="end_time_input_key", # Уникальный ключ для виджета
+        on_change=update_end_time # Вызываем функцию при изменении
+    )
 
-# Об'єднуємо дату та час в один datetime об'єкт (в UTC)
-start_datetime_full = datetime.datetime.combine(start_date, start_time).replace(tzinfo=pytz.utc)
-end_datetime_full = datetime.datetime.combine(end_date, end_time).replace(tzinfo=pytz.utc)
+# --- КОНВЕРТАЦИЯ ЛОКАЛЬНОГО ВРЕМЕНИ В UTC ---
+# 1. Объединяем дату и время без часового пояса (naive datetime)
+start_datetime_naive = datetime.datetime.combine(start_date, start_time_selected)
+end_datetime_naive = datetime.datetime.combine(end_date, end_time_selected)
 
-# Перевірка, що дата початку не пізніше дати закінчення
+# 2. Делаем naive datetime "aware" о выбранном часовом поясе
+start_datetime_local = local_tz_object.localize(start_datetime_naive, is_dst=None)
+end_datetime_local = local_tz_object.localize(end_datetime_naive, is_dst=None)
+
+# 3. Конвертируем локализованные datetime в UTC
+start_datetime_full = start_datetime_local.astimezone(pytz.utc)
+end_datetime_full = end_datetime_local.astimezone(pytz.utc)
+
+# Проверка, что дата начала не позднее даты окончания
 if start_datetime_full > end_datetime_full:
     st.error("Помилка: Дата та час початку періоду не може бути пізніше дати та часу закінчення.")
     st.stop()
 
-# --- Розділ для налаштування звіту (вибір колонок) ---
+# --- Раздел для настройки отчета (выбор колонок) ---
 st.header("Налаштування звіту")
 
-# Назви колонок повинні точно збігатися з тим, що повертає get_fleet_odometer_and_fuel_data у mapon_api_client.py
+# Названия колонок должны точно совпадать с тем, что возвращает get_fleet_odometer_and_fuel_data в mapon_api_client.py
 all_possible_columns = [
     'Номер Автомобіля',
     'Одометр CAN (початок)',
@@ -263,10 +333,20 @@ all_possible_columns = [
     'Середня витрата (л/100км)'
 ]
 
+# Инициализация session_state для хранения выбранных колонок
+if 'selected_columns_value' not in st.session_state:
+    st.session_state['selected_columns_value'] = all_possible_columns # По умолчанию все колонки
+
+# Функция для обновления session_state для колонок
+def update_selected_columns():
+    st.session_state['selected_columns_value'] = st.session_state['multiselect_columns_key']
+
 selected_columns = st.multiselect(
     "Оберіть колонки для відображення у звіті:",
     options=all_possible_columns,
-    default=all_possible_columns
+    default=st.session_state['selected_columns_value'],
+    key="multiselect_columns_key", # Уникальный ключ
+    on_change=update_selected_columns # Вызываем функцию при изменении
 )
 
 if not selected_columns:
@@ -274,12 +354,12 @@ if not selected_columns:
     st.stop()
 
 
-# --- Кнопка для запуску звіту ---
+# --- Кнопка для запуска отчета ---
 st.write("")
 if st.button("Згенерувати звіт", help="Натисніть, щоб отримати дані з Mapon"):
-    st.info("Завантаження даних... Це може зайняти деякий час в залежності від кількості автомобілів та обраного періоду.")
+    st.info(f"Завантаження даних для періоду з {start_datetime_local.strftime('%Y-%m-%d %H:%M:%S %Z%z')} по {end_datetime_local.strftime('%Y-%m-%d %H:%M:%S %Z%z')}... (Це {start_datetime_full.strftime('%Y-%m-%d %H:%M:%S UTC')} по {end_datetime_full.strftime('%Y-%m-%d %H:%M:%S UTC')} у UTC).")
 
-    # Запускаємо нашу основну функцію з mapon_api_client.py
+    # Запускаем нашу основную функцию из mapon_api_client.py
     with st.spinner('Отримання даних з Mapon API...'):
         try:
             df = get_fleet_odometer_and_fuel_data(api_key, start_datetime_full, end_datetime_full)
@@ -288,7 +368,7 @@ if st.button("Згенерувати звіт", help="Натисніть, щоб
                 st.success("Дані успішно завантажено!")
                 st.write("")
                 
-                # Фільтруємо DataFrame за обраними колонками
+                # Фильтруем DataFrame по выбранным колонкам
                 columns_to_show = [col for col in selected_columns if col in df.columns]
                 
                 if not columns_to_show:
@@ -299,7 +379,7 @@ if st.button("Згенерувати звіт", help="Натисніть, щоб
                     df_display = df[columns_to_show]
                     st.dataframe(df_display.style.highlight_null(), use_container_width=True)
 
-                # --- Кнопка для завантаження Excel ---
+                # --- Кнопка для загрузки Excel ---
                 st.write("")
                 st.subheader("Завантажити звіт")
                 
