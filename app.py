@@ -8,13 +8,14 @@ from io import BytesIO # Для збереження Excel в пам'ять
 from mapon_api_client import get_fleet_odometer_and_fuel_data
 
 # --- Налаштування Streamlit сторінки ---
+# Ця команда МАЄ бути ПЕРШОЮ командою Streamlit у скрипті!
 st.set_page_config(
     page_title="Звіт автопарку Mapon",
     page_icon="🚗",
-    layout="wide" # Робимо сторінку широкою для кращого відображення таблиць
+    layout="wide" # Робимо сторінку широкою для кращого відображення таблиць, але головне - використовуємо st.sidebar
 )
 
-# Користувацькі CSS для стилізації
+# Користувацькі CSS для стилізації (оновлено на зелено-чорну гаму з читабельністю)
 st.markdown("""
     <style>
     /* Основний контейнер для відступів та фону */
@@ -68,6 +69,7 @@ st.markdown("""
         margin-bottom: 0.25rem; /* Зменшимо відступ між лейблом та полем */
         display: block; /* Забезпечимо, щоб лейбл займав свій рядок */
     }
+
     .stTextInput div[data-baseweb="input"] input,
     .stDateInput div[data-baseweb="input"] input,
     .stTimeInput div[data-baseweb="input"] input,
@@ -76,9 +78,20 @@ st.markdown("""
         border-radius: 4px;
         padding: 0.5rem 1rem;
         font-size: 1rem;
-        color: #333333;
+        color: #333333 !important; /* Змінено на темний колір для тексту, додано !important */
+        background-color: white !important; /* Забезпечуємо білий фон, додано !important */
         box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); /* Внутрішня тінь для ефекту глибины */
     }
+
+    /* Стиль для плейсхолдерів (тексту заповнювача) */
+    .stTextInput div[data-baseweb="input"] input::placeholder,
+    .stDateInput div[data-baseweb="input"] input::placeholder,
+    .stTimeInput div[data-baseweb="input"] input::placeholder,
+    .stMultiSelect div[data-baseweb="select"] input::placeholder {
+        color: #666666 !important; /* Темніший колір для плейсхолдера, додано !important */
+        opacity: 1; /* Для Firefox */
+    }
+
     .stTextInput div[data-baseweb="input"]:focus-within,
     .stDateInput div[data-baseweb="input"]:focus-within,
     .stTimeInput div[data-baseweb="input"]:focus-within,
@@ -94,10 +107,14 @@ st.markdown("""
         border-radius: 4px;
         box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
     }
+    /* Колір тексту всередині поля мультиселекта (коли вводиться для пошуку) */
+    .stMultiSelect div[data-baseweb="select"] input {
+        color: #333333 !important; /* Темний колір тексту для поля вводу в мультиселекті */
+    }
     /* Колір фону для вибраних елементів (колонок) */
     .stMultiSelect span[data-baseweb="tag"] {
         background-color: #eafbe1 !important; /* Дуже світлий зелений */
-        color: #388e3c !important; /* Темно-зелений текст */
+        color: #388e3c !important; /* Темно-зелений текст - ПОКРАЩЕНО */
         border: 1px solid #7ab800 !important; /* Зелена рамка */
         border-radius: 4px !important;
         font-size: 0.75rem !important;
@@ -106,7 +123,7 @@ st.markdown("""
     }
     /* Колір іконки закриття вибраного елемента */
     .stMultiSelect span[data-baseweb="tag"] svg {
-        fill: #388e3c !important;
+        fill: #388e3c !important; /* Темно-зелена іконка - ПОКРАЩЕНО */
     }
     /* Колір фону при наведенні на опцію у випадаючому списку */
     div[role="option"]:hover {
@@ -114,7 +131,7 @@ st.markdown("""
     }
     /* Колір тексту опції у випадаючому списку */
     div[role="option"] span {
-        color: #333333 !important;
+        color: #333333 !important; /* Темний текст для опцій - ПОКРАЩЕНО */
     }
     /* Зменшуємо шрифт для вибраних елементів в полі мультиселекта (дублюємо, бо специфічність) */
     div[data-baseweb="select"] span.css-1n74gkj {
@@ -190,136 +207,137 @@ st.markdown("""
         background-color: #e8f5e9;
     }
     
-    /* Стилізація бічної панелі (якщо використовується) */
-    .st-emotion-cache-vk33z2 { /* Цей клас може змінюватися в майбутніх версіях Streamlit */
+    /* Стилізація бічної панелі */
+    /* Ці класи можуть змінюватися в майбутніх версіях Streamlit, тому краще перевіряти їх при оновленні */
+    .st-emotion-cache-vk33z2, .st-emotion-cache-1f190u8 { /* Оновлені селектори для бічної панелі */
         background-color: #212121; /* Дуже темний сірий/майже чорний, як на Mapon */
         color: #ffffff; /* Білий текст на бічній панелі */
     }
-    .st-emotion-cache-vk33z2 .st-emotion-cache-1pxe4x4 {
-        color: #dddddd; /* Світло-сірий для звичайних посилань */
+    .st-emotion-cache-vk33z2 h1, .st-emotion-cache-1f190u8 h1,
+    .st-emotion-cache-vk33z2 h2, .st-emotion-cache-1f190u8 h2,
+    .st-emotion-cache-vk33z2 h3, .st-emotion-cache-1f190u8 h3 {
+        color: #8BC34A; /* Зелені заголовки сайдбару */
+        border-bottom: 1px solid #333333; /* Легка розділяюча лінія */
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
     }
-    .st-emotion-cache-vk33z2 .st-emotion-cache-1pxe4x4:hover {
-        color: #7ab800; /* Зелений при наведенні */
+    /* Лейбли input полів на сайдбарі */
+    .st-emotion-cache-vk33z2 .stTextInput label,
+    .st-emotion-cache-1f190u8 .stTextInput label,
+    .st-emotion-cache-vk33z2 .stDateInput label,
+    .st-emotion-cache-1f190u8 .stDateInput label,
+    .st-emotion-cache-vk33z2 .stTimeInput label,
+    .st-emotion-cache-1f190u8 .stTimeInput label,
+    .st-emotion-cache-vk33z2 .stMultiSelect label,
+    .st-emotion-cache-1f190u8 .stMultiSelect label,
+    .st-emotion-cache-vk33z2 .stSelectbox label,
+    .st-emotion-cache-1f190u8 .stSelectbox label {
+        color: #ADD8E6; /* Світло-блакитний для лейблів на сайдбарі */
     }
-    .st-emotion-cache-vk33z2 .st-emotion-cache-1pxe4x4.active {
-        color: #7ab800; /* Активний пункт зеленим */
-        font-weight: bold;
+
+    /* Стилі для тексту всередині полів на сайдбарі */
+    .st-emotion-cache-vk33z2 .stTextInput div[data-baseweb="input"] input,
+    .st-emotion-cache-1f190u8 .stTextInput div[data-baseweb="input"] input,
+    .st-emotion-cache-vk33z2 .stDateInput div[data-baseweb="input"] input,
+    .st-emotion-cache-1f190u8 .stDateInput div[data-baseweb="input"] input,
+    .st-emotion-cache-vk33z2 .stTimeInput div[data-baseweb="input"] input,
+    .st-emotion-cache-1f190u8 .stTimeInput div[data-baseweb="input"] input,
+    .st-emotion-cache-vk33z2 .stSelectbox div[data-baseweb="select"],
+    .st-emotion-cache-1f190u8 .stSelectbox div[data-baseweb="select"] {
+        color: #e0e0e0 !important; /* Світлий текст у полях на сайдбарі */
+        background-color: #333333 !important; /* Темний фон полів на сайдбарі */
+        border-color: #555555 !important; /* Трохи світліша рамка на сайдбарі */
     }
+    /* Стилі для плейсхолдерів на сайдбарі */
+    .st-emotion-cache-vk33z2 .stTextInput div[data-baseweb="input"] input::placeholder,
+    .st-emotion-cache-1f190u8 .stTextInput div[data-baseweb="input"] input::placeholder {
+        color: #b0b0b0 !important; /* Світліший плейсхолдер на темному фоні сайдбару */
+    }
+    /* Стиль для мультиселекта на сайдбарі (вибрані теги) */
+    .st-emotion-cache-vk33z2 .stMultiSelect span[data-baseweb="tag"],
+    .st-emotion-cache-1f190u8 .stMultiSelect span[data-baseweb="tag"] {
+        background-color: #333333 !important; /* Темний фон для тегів на сайдбарі */
+        color: #ADD8E6 !important; /* Світло-блакитний текст тегів на сайдбарі */
+        border-color: #666666 !important; /* Світліша рамка */
+    }
+    /* Іконка закриття тега на сайдбарі */
+    .st-emotion-cache-vk33z2 .stMultiSelect span[data-baseweb="tag"] svg,
+    .st-emotion-cache-1f190u8 .stMultiSelect span[data-baseweb="tag"] svg {
+        fill: #ADD8E6 !important; /* Колір іконки закриття на сайдбарі */
+    }
+    /* Опції мультиселекта у випадаючому списку на сайдбарі */
+    .st-emotion-cache-vk33z2 div[role="option"] span,
+    .st-emotion-cache-1f190u8 div[role="option"] span {
+        color: #333333 !important; /* Темний текст опцій */
+    }
+    .st-emotion-cache-vk33z2 div[role="option"]:hover,
+    .st-emotion-cache-1f190u8 div[role="option"]:hover {
+        background-color: #e0e0e0 !important; /* Світлий фон при наведенні */
+    }
+
     </style>
     """, unsafe_allow_html=True)
 
+# Ініціалізація session_state
+if 'df_report' not in st.session_state:
+    st.session_state.df_report = pd.DataFrame()
+if 'report_generated' not in st.session_state:
+    st.session_state.report_generated = False
+if 'start_date_display' not in st.session_state:
+    st.session_state.start_date_display = None
+if 'end_date_display' not in st.session_state:
+    st.session_state.end_date_display = None
 
-st.title("🌱 Звіт автопарку Mapon")
-st.markdown("Тут ви можете отримати детальний звіт щодо одометра та витрат пального вашого автопарку за обраний період.")
+# --- Бокова панель для введення API ключа та вибору періоду ---
+st.sidebar.header("Налаштування API Mapon")
+api_key = st.sidebar.text_input("Введіть ваш API ключ Mapon", type="password")
 
-# --- Введення API ключа ---
-api_key = st.text_input("Введіть ваш Mapon API Key", type="password")
-
-# Перевіряємо, чи введено API ключ
 if not api_key:
-    st.warning("Будь ласка, введіть ваш Mapon API Key для продовження.")
-    st.stop()
+    st.sidebar.warning("Будь ласка, введіть ваш Mapon API Key для продовження.")
+    st.stop() # Зупиняємо виконання, якщо API ключ не введено
 
-# --- Вибір діапазону дат та часу ---
-st.header("Оберіть період для звіту")
+st.sidebar.markdown("---")
+st.sidebar.header("Вибір періоду")
 
-# Функции для обновления session_state для времени
-def update_start_time():
-    st.session_state['start_time_value'] = st.session_state['start_time_input_key']
+# Отримуємо поточну дату та час в Києві (або ваш бажаний часовий пояс)
+kyiv_tz = pytz.timezone('Europe/Kiev')
+now_kyiv = datetime.datetime.now(kyiv_tz)
 
-def update_end_time():
-    st.session_state['end_time_value'] = st.session_state['end_time_input_key']
+# ВИПРАВЛЕНО: Дати за замовчуванням - вчора і сьогодні
+default_start_date = (now_kyiv - datetime.timedelta(days=1)).date()
+default_start_time = datetime.time(0, 0, 0) # Початок дня
 
-# Инициализация session_state для хранения выбранного времени и часового пояса
-if 'start_time_value' not in st.session_state:
-    st.session_state['start_time_value'] = datetime.time(0, 0, 0)
-if 'end_time_value' not in st.session_state:
-    st.session_state['end_time_value'] = datetime.time(23, 59, 59)
+default_end_date = now_kyiv.date()
+default_end_time = datetime.time(23, 59, 59) # Кінець дня
 
-# Получаем список всех часовых поясов из pytz
-all_timezones = sorted(pytz.all_timezones)
+# Вибір дати та часу початку на бічній панелі
+start_date = st.sidebar.date_input("Дата початку", value=default_start_date)
+start_time = st.sidebar.time_input("Час початку", value=default_start_time)
 
-# Определяем часовой пояс по умолчанию. Попробуем угадать местный, или установим Киев.
-default_timezone = "Europe/Kiev" # Начальное значение по умолчанию
-try:
-    # Попытка получить локальный часовой пояс пользователя
-    import tzlocal
-    local_tz = tzlocal.get_localzone().zone
-    if local_tz in all_timezones:
-        default_timezone = local_tz
-except Exception:
-    pass # Если tzlocal не сработал или не установлен, оставим default_timezone
+# Вибір дати та часу закінчення на бічній панелі
+end_date = st.sidebar.date_input("Дата закінчення", value=default_end_date)
+end_time = st.sidebar.time_input("Час закінчення", value=default_end_time)
 
-if 'selected_timezone' not in st.session_state:
-    st.session_state['selected_timezone'] = default_timezone
+# Об'єднуємо дату і час в локальному часовому поясі
+start_datetime_local = datetime.datetime.combine(start_date, start_time)
+end_datetime_local = datetime.datetime.combine(end_date, end_time)
 
-# Виджет выбора часового пояса
-selected_timezone_str = st.selectbox(
-    "Оберіть ваш часовий пояс:",
-    options=all_timezones,
-    index=all_timezones.index(st.session_state['selected_timezone']), # Устанавливаем выбранный по умолчанию
-    key="timezone_select_key",
-    help="Всі дати та час нижче будуть інтерпретуватися у вибраному часовому поясі, а потім конвертовані в UTC для Mapon API."
-)
-# Обновляем session_state после выбора часового пояса
-st.session_state['selected_timezone'] = selected_timezone_str
+# Локалізуємо і конвертуємо в UTC
+start_datetime_utc = kyiv_tz.localize(start_datetime_local).astimezone(pytz.utc)
+end_datetime_utc = kyiv_tz.localize(end_datetime_local).astimezone(pytz.utc)
 
-# Создаем объект часового пояса из выбранной строки
-try:
-    local_tz_object = pytz.timezone(selected_timezone_str)
-except pytz.UnknownTimeZoneError:
-    st.error(f"Помилка: Невідомий часовий пояс '{selected_timezone_str}'. Будь ласка, оберіть інший.")
-    st.stop()
+# Перевірка, що дата початку не пізніше дати закінчення
+if start_datetime_utc > end_datetime_utc:
+    st.sidebar.error("Помилка: Дата та час початку періоду не може бути пізніше дати та часу закінчення.")
+    st.stop() # Зупиняємо виконання, якщо дати некоректні
 
-# Текущая дата в местном часовом поясе
-now_local_datetime = datetime.datetime.now(local_tz_object)
-default_start_date = (now_local_datetime - datetime.timedelta(days=1)).date()
-default_end_date = now_local_datetime.date()
+st.sidebar.markdown("---")
 
+# --- Основна частина сторінки ---
+st.title("Звіт по автопарку Mapon")
+st.write("Отримайте детальний звіт по пробігу та витраті палива вашого автопарку за обраний період.")
 
-col1, col2 = st.columns(2)
-with col1:
-    start_date = st.date_input("Дата початку (обраний часовий пояс)", value=default_start_date)
-    start_time_selected = st.time_input(
-        "Час початку (обраний часовий пояс)",
-        value=st.session_state['start_time_value'],
-        step=300, # Шаг в секундах (300 секунд = 5 минут)
-        key="start_time_input_key", # Уникальный ключ для виджета
-        on_change=update_start_time # Вызываем функцию при изменении
-    )
-
-with col2:
-    end_date = st.date_input("Дата закінчення (обраний часовий пояс)", value=default_end_date)
-    end_time_selected = st.time_input(
-        "Час закінчення (обраний часовий пояс)",
-        value=st.session_state['end_time_value'],
-        step=300, # Шаг в секундах (300 секунд = 5 минут)
-        key="end_time_input_key", # Уникальный ключ для виджета
-        on_change=update_end_time # Вызываем функцию при изменении
-    )
-
-# --- КОНВЕРТАЦИЯ ЛОКАЛЬНОГО ВРЕМЕНИ В UTC ---
-# 1. Объединяем дату и время без часового пояса (naive datetime)
-start_datetime_naive = datetime.datetime.combine(start_date, start_time_selected)
-end_datetime_naive = datetime.datetime.combine(end_date, end_time_selected)
-
-# 2. Делаем naive datetime "aware" о выбранном часовом поясе
-start_datetime_local = local_tz_object.localize(start_datetime_naive, is_dst=None)
-end_datetime_local = local_tz_object.localize(end_datetime_naive, is_dst=None)
-
-# 3. Конвертируем локализованные datetime в UTC
-start_datetime_full = start_datetime_local.astimezone(pytz.utc)
-end_datetime_full = end_datetime_local.astimezone(pytz.utc)
-
-# Проверка, что дата начала не позднее даты окончания
-if start_datetime_full > end_datetime_full:
-    st.error("Помилка: Дата та час початку періоду не може бути пізніше дати та часу закінчення.")
-    st.stop()
-
-# --- Раздел для настройки отчета (выбор колонок) ---
-st.header("Налаштування звіту")
-
-# Названия колонок должны точно совпадать с тем, что возвращает get_fleet_odometer_and_fuel_data в mapon_api_client.py
+# Визначаємо всі можливі колонки
 all_possible_columns = [
     'Номер Автомобіля',
     'Одометр CAN (початок)',
@@ -329,83 +347,84 @@ all_possible_columns = [
     'Паливо в баку (кінець, л)',
     'Заправлено за період (л)',
     'Зливи за період (л)',
-    'Витрата (датчик, л)',
-    'Середня витрата (л/100км)'
+    'Витрата (датчик рівня, л)',
+    'Середня витрата (датчик рівня, л/100км)',
+    'Витрата (CAN Flow, л)',
+    'Середня витрата (CAN Flow, л/100км)'
 ]
 
-# Инициализация session_state для хранения выбранных колонок
-if 'selected_columns_value' not in st.session_state:
-    st.session_state['selected_columns_value'] = all_possible_columns # По умолчанию все колонки
-
-# Функция для обновления session_state для колонок
-def update_selected_columns():
-    st.session_state['selected_columns_value'] = st.session_state['multiselect_columns_key']
-
+# Мультиселект для вибору колонок, на основній панелі (як і було в попередньому коді)
 selected_columns = st.multiselect(
     "Оберіть колонки для відображення у звіті:",
     options=all_possible_columns,
-    default=st.session_state['selected_columns_value'],
-    key="multiselect_columns_key", # Уникальный ключ
-    on_change=update_selected_columns # Вызываем функцию при изменении
+    default=all_possible_columns # За замовчуванням обираємо всі
 )
 
-if not selected_columns:
-    st.warning("Будь ласка, оберіть хоча б одну колонку для відображення.")
-    st.stop()
-
-
-# --- Кнопка для запуска отчета ---
-st.write("")
-if st.button("Згенерувати звіт", help="Натисніть, щоб отримати дані з Mapon"):
-    st.info(f"Завантаження даних для періоду з {start_datetime_local.strftime('%Y-%m-%d %H:%M:%S %Z%z')} по {end_datetime_local.strftime('%Y-%m-%d %H:%M:%S %Z%z')}... (Це {start_datetime_full.strftime('%Y-%m-%d %H:%M:%S UTC')} по {end_datetime_full.strftime('%Y-%m-%d %H:%M:%S UTC')} у UTC).")
-
-    # Запускаем нашу основную функцию из mapon_api_client.py
-    with st.spinner('Отримання даних з Mapon API...'):
-        try:
-            df = get_fleet_odometer_and_fuel_data(api_key, start_datetime_full, end_datetime_full)
-            
-            if not df.empty:
-                st.success("Дані успішно завантажено!")
-                st.write("")
+# Кнопка генерації звіту на бічній панелі
+if st.sidebar.button("Згенерувати Звіт"):
+    if not api_key:
+        # Це вже обробляється вище через st.stop(), але залишимо для дублюючої перевірки
+        st.sidebar.error("Будь ласка, введіть ваш API ключ Mapon.")
+    elif not selected_columns:
+        st.sidebar.warning("Будь ласка, оберіть хоча б одну колонку для відображення у звіті.")
+    else:
+        with st.spinner("Завантаження даних... Це може зайняти деякий час для великих автопарків."):
+            try:
+                df = get_fleet_odometer_and_fuel_data(api_key, start_datetime_utc, end_datetime_utc)
                 
-                # Фильтруем DataFrame по выбранным колонкам
-                columns_to_show = [col for col in selected_columns if col in df.columns]
-                
-                if not columns_to_show:
-                    st.warning("Обрані колонки не знайдено в отриманих даних. Відображаю всі доступні колонки.")
-                    st.dataframe(df.style.highlight_null(), use_container_width=True)
+                if not df.empty:
+                    st.session_state.df_report = df # Зберігаємо повний DataFrame у session_state
+                    st.session_state.report_generated = True
+                    st.session_state.start_date_display = start_date.strftime('%Y%m%d') # Зберігаємо для імені файлу
+                    st.session_state.end_date_display = end_date.strftime('%Y%m%d')    # Зберігаємо для імені файлу
+                    st.success("Звіт успішно згенеровано!")
                 else:
-                    st.subheader("Результати звіту")
-                    df_display = df[columns_to_show]
-                    st.dataframe(df_display.style.highlight_null(), use_container_width=True)
+                    st.session_state.df_report = pd.DataFrame() # Очищаємо, якщо немає даних
+                    st.session_state.report_generated = False
+                    st.warning("Звіт не містить даних для обраного періоду. Перевірте обраний період та/або активність юнітів у Mapon.")
+            
+            except Exception as e:
+                st.session_state.df_report = pd.DataFrame() # Очищаємо при помилці
+                st.session_state.report_generated = False
+                st.error(f"Виникла помилка при завантаженні даних: {e}. Будь ласка, перевірте API Key.")
 
-                # --- Кнопка для загрузки Excel ---
-                st.write("")
-                st.subheader("Завантажити звіт")
-                
-                @st.cache_data
-                def convert_df_to_excel(df_to_convert):
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        df_to_convert.to_excel(writer, index=False, sheet_name='Звіт по автопарку')
-                        worksheet = writer.sheets['Звіт по автопарку']
-                        for i, col in enumerate(df_to_convert.columns):
-                            max_len = max(df_to_convert[col].astype(str).map(len).max(), len(col)) + 2
-                            worksheet.set_column(i, i, max_len)
-                    processed_data = output.getvalue()
-                    return processed_data
+# Відображення звіту, якщо він був згенерований
+if st.session_state.report_generated and not st.session_state.df_report.empty:
+    st.subheader("Попередній перегляд звіту")
+    
+    # Перевіряємо, чи всі selected_columns дійсно є в df_report
+    actual_selected_columns = [col for col in selected_columns if col in st.session_state.df_report.columns]
+    
+    if actual_selected_columns:
+        df_display = st.session_state.df_report[actual_selected_columns]
+        st.dataframe(df_display, use_container_width=True)
 
-                excel_data = convert_df_to_excel(df_display)
-                st.download_button(
-                    label="📥 Завантажити звіт у Excel",
-                    data=excel_data,
-                    file_name=f"Mapon_Звіт_Автопарку_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                
-            else:
-                st.warning("Звіт не містить даних. Перевірте обраний період або переконайтесь, що Mapon API повернув дані для активних юнітів.")
+        # Функція для конвертації DataFrame в Excel (кешується)
+        @st.cache_data
+        def convert_df_to_excel(df_to_convert):
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df_to_convert.to_excel(writer, index=False, sheet_name='Звіт по автопарку')
+                worksheet = writer.sheets['Звіт по автопарку']
+                for i, col in enumerate(df_to_convert.columns):
+                    # Розширюємо стовпці для кращої читабельності
+                    max_len = max(df_to_convert[col].astype(str).map(len).max(), len(col)) + 2
+                    worksheet.set_column(i, i, max_len)
+            processed_data = output.getvalue()
+            return processed_data
+
+        excel_data = convert_df_to_excel(df_display) # Передаємо відфільтрований DataFrame
+        st.download_button(
+            label="📥 Завантажити звіт у Excel",
+            data=excel_data,
+            # Використовуємо збережені дати для імені файлу
+            file_name=f"Mapon_Звіт_Автопарку_{st.session_state.start_date_display}_{st.session_state.end_date_display}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
         
-        except Exception as e:
-            st.error(f"Виникла помилка при завантаженні даних: {e}. Будь ласка, перевірте API Key та спробуйте ще раз.")
-            st.exception(e)
+    else:
+        st.warning("Вибрані колонки не знайдені в згенерованому звіті або звіт порожній. Будь ласка, перегенеруйте звіт.")
+elif st.session_state.report_generated and st.session_state.df_report.empty:
+    st.warning("Звіт згенеровано, але він не містить даних для відображення з обраними параметрами.")
+elif not st.session_state.report_generated:
+    st.info("Введіть API ключ, оберіть період та натисніть 'Згенерувати Звіт', щоб отримати дані.")
