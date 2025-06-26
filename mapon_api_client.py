@@ -330,11 +330,7 @@ def get_fleet_odometer_and_fuel_data(api_key: str, start_datetime: datetime.date
     
     df = pd.DataFrame(results)
     return df
-
-# Приклад використання (пізніше це буде частина Streamlit)
-if __name__ == '__main__':
-    API_KEY = "23795daca9a629820c618d27c7aa7319b01656e7" # Замініть на ваш реальний API ключ для тестування
-    
+ 
     # Дати та час у UTC для прикладу
     # 31 травня 21:00:00 UTC = 1 червня 00:00:00 Київ
     start_date_example = datetime.datetime(2025, 5, 31, 21, 0, 0, tzinfo=pytz.utc) 
